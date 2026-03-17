@@ -138,6 +138,8 @@ document.getElementById("duracionTxt").textContent = Math.floor(DURATION_SECONDS
   let candidate = null;
   let sessionId = null
 let employeeId = null
+let tokenId = null
+let sessionDate = null
   let QUESTIONS = []
   let startedAtMs = null;
   let deadlineMs = null;
@@ -298,29 +300,34 @@ if(!token){
 setValidateMsg("Debes ingresar el token de evaluación.","small badTxt")
 return
 }
-  const { data: tokenRow } = await supabase
-.from("evaluation_tokens")
-.select("evaluation_id, session_id")
-.eq("token",token)
-.eq("activo",true)
-.single()
+ const { data: tokenRow } = await supabase
+  .from("evaluation_tokens")
+  .select("id, session_id, session_date")
+  .eq("token", token)
+  .eq("activo", true)
+  .single()
 
 if(!tokenRow){
   setValidateMsg("Token inválido o expirado.","small badTxt")
   return
 }
 
-const evaluationId = tokenRow.evaluation_id
+tokenId = tokenRow.id
+sessionDate = tokenRow.session_date
+
+
+
 sessionId = tokenRow.session_id
 if (!candidate) return;
 
 // 🚫 VALIDAR SI YA PRESENTÓ (ANTES DE ENTRAR AL EXAMEN)
 const { data: intentoPrevio, error: intentoError } = await supabase
-.from("exam_results")
-.select("id")
-.eq("employee_id", employeeId)
-.eq("session_id", sessionId)
-.limit(1)
+  .from("evaluations")
+  .select("id")
+  .eq("employee_id", employeeId)
+  .eq("session_id", sessionId)
+  .eq("session_date", sessionDate)
+  .limit(1)
 
 if (intentoError) {
   setValidateMsg("Error validando intentos.", "small badTxt")
@@ -348,7 +355,7 @@ if (intentoPrevio && intentoPrevio.length > 0) {
 const { data, error } = await supabase
 .from("evaluation_questions")
 .select("*")
-.eq("evaluation_id", evaluationId)
+.eq("session_id", sessionId)
 
 if (error) {
 setValidateMsg("Error cargando preguntas.", "small badTxt")
@@ -360,16 +367,7 @@ if (!data || data.length === 0) {
 setValidateMsg("Esta evaluación no tiene preguntas cargadas.", "small badTxt")
 return
 }
-const { data: evalData, error: evalError } = await supabase
-.from("evaluations")
-.select("preguntas_totales")
-.eq("id", evaluationId)
-.single()
-
-if(evalError || !evalData){
-setValidateMsg("No se encontró la configuración de la evaluación.","small badTxt")
-return
-}
+const preguntasTotales = 10 
     
 QUESTIONS = data.map(q => ({
   id: q.id,
@@ -383,7 +381,7 @@ QUESTIONS = data.map(q => ({
   correct: ["A","B","C","D"].indexOf(q.respuesta_correcta)
 }))
 
-QUESTIONS = shuffleArray(QUESTIONS).slice(0, Math.min(evalData.preguntas_totales, QUESTIONS.length))
+QUESTIONS = shuffleArray(QUESTIONS).slice(0, Math.min(preguntasTotales, QUESTIONS.length))
 
 qTotalEl.textContent = String(QUESTIONS.length)
 
@@ -502,25 +500,18 @@ try {
   console.log("SESSION QUE SE ENVIA:", sessionId)
   
     const payload = {
-session_id: sessionId,
-employee_id: employeeId,
-cedula: (cedulaEl.value || "").trim(),
-nombre: candidate.nombre,
-cargo: candidate.cargo,
-email: candidate.email,
-celular: candidate.celular,
-started_at: new Date(startedAtMs).toISOString(),
-finished_at: new Date(finishedAtMs).toISOString(),
-duration_seconds: durationSeconds,
-score: score,
-total: total,
-percent: percent,
-answers: answers,
-auto_submitted: !!isAuto
+  session_id: sessionId,
+  employee_id: employeeId,
+  session_date: sessionDate,
+  token_id: tokenId,
+  score: score,
+  total: total,
+  percent: percent,
+  estado: percent >= 80 ? "aprobado" : "reprobado"
 }
 
 const { error: saveError } = await supabase
-.from("exam_results")
+.from("evaluations")
 .insert(payload)
 
 if(saveError){
@@ -563,7 +554,7 @@ doneText.innerHTML = `
     <h3 class="${color}">${mensajeFinal}</h3>
     
     <p>
-      Cédula: <b>${escapeHtml(payload.cedula)}</b><br/>
+      Cédula: <b>${escapeHtml(cedulaEl.value)}</b><br/>
       Puntaje: <b>${payload.score} / ${payload.total}</b><br/>
       Porcentaje: <b>${payload.percent}%</b>
     </p>
