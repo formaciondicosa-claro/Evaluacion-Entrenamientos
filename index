@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prueba</title>
+  <style>
+    :root{--bg:#0b1020;--card:#121a33;--soft:#1b2650;--txt:#eaf0ff;--mut:#b9c3e6;--ok:#22c55e;--bad:#ef4444;--warn:#f59e0b}
+    *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#121a33,#0b1020);color:var(--txt);display:flex;justify-content:center;padding:18px}
+    .wrap{width:100%;max-width:980px}
+    .card{background:rgba(18,26,51,.92);border:1px solid rgba(185,195,230,.18);border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+    h1,h2{margin:0 0 10px}
+    p{color:var(--mut);margin:8px 0}
+    label{display:block;margin:10px 0 6px;color:var(--mut);font-size:.92rem}
+    input{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(185,195,230,.22);background:#0e1633;color:var(--txt);outline:none}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn{cursor:pointer;border:0;border-radius:12px;padding:12px 14px;font-weight:700;background:#2a3a7a;color:var(--txt)}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .btn.ok{background:linear-gradient(135deg,#1f7a4a,#22c55e)}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .pill{padding:8px 10px;border-radius:999px;background:rgba(185,195,230,.12);border:1px solid rgba(185,195,230,.18);color:var(--mut);font-size:.92rem}
+    .timer{font-variant-numeric:tabular-nums;color:#fff}
+    .q{padding:14px;border-radius:14px;background:rgba(185,195,230,.07);border:1px solid rgba(185,195,230,.14);margin-top:12px}
+    .opt{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:12px;border:1px solid rgba(185,195,230,.16);background:rgba(14,22,51,.55);margin:8px 0}
+    .opt input{width:auto;margin-top:2px}
+    .hidden{display:none!important}
+    .warn{color:var(--warn)}
+    .badTxt{color:var(--bad)}
+    .okTxt{color:var(--ok)}
+    img.qimg{max-width:100%;border-radius:12px;border:1px solid rgba(185,195,230,.18);margin:10px 0;display:block}
+    .small{font-size:.9rem}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>Prueba de Conocimiento </h1>
+    <p>
+  Duración: <b><span id="duracionTxt"></span> minutos</b>.
+  Si el tiempo termina, la prueba se envía automáticamente.
+</p>
+
+    <p class="small warn">Recomendación: usar PC y una sola pestaña del navegador.</p>
+  </div>
+
+  <div id="stepValidate" class="card">
+    <h2>Registro y Validación</h2>
+    <p>Ingresa tu cédula. Si estás citado, podrás iniciar la prueba.</p>
+
+    <div class="row">
+      <div>
+        <label>Cédula</label>
+        <input id="cedula" inputmode="numeric" placeholder="Ej: 1000123456" />
+      </div>
+      <div>
+        <label>Celular</label>
+        <input id="celular" inputmode="tel" placeholder="Ej: 3001234567" />
+        <label>Token de evaluación</label>
+<input id="token" placeholder="Ej: AB12CD" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Correo</label>
+        <input id="email" type="email" placeholder="correo@dominio.com" />
+      </div>
+      <div>
+        <label>Confirmación</label>
+        <input id="confirm" placeholder="Escribe: ACEPTO" />
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px">
+      <button id="btnValidate" class="btn">Validar citación</button>
+      <button id="btnStart" class="btn ok" disabled>Iniciar prueba</button>
+    </div>
+
+    <p id="msgValidate" class="small"></p>
+  </div>
+
+  <div id="stepExam" class="card hidden">
+    <div class="topbar">
+      <div class="pill"><b id="who"></b> <span id="whoRole"></span></div>
+      <div class="pill timer">Tiempo: <b id="timer">15:00</b></div>
+      <div class="pill">Pregunta <b id="qIndex">1</b>/<b id="qTotal">0</b></div>
+    </div>
+
+    <div id="qBox" class="q"></div>
+
+    <div style="display:flex;gap:10px;justify-content:space-between;margin-top:12px;flex-wrap:wrap">
+<div style="display:flex;gap:10px">
+        <button id="btnNext" class="btn">Siguiente</button>
+        <button id="btnSubmit" class="btn ok hidden">Enviar</button>
+      </div>
+    </div>
+
+    <p id="msgExam" class="small"></p>
+  </div>
+
+  <div id="stepDone" class="card hidden">
+    <h2>Prueba enviada</h2>
+    <p id="doneText"></p>
+  </div>
+
+</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  
+<script type="module">
+ 
+ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+
+const supabase = createClient(
+"https://ewlqelsmrnmuvylxlpur.supabase.co",
+"sb_publishable_y6G6nvMYnWpSIpcbrhah_Q_LkvOGktb"
+)
+    
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+function todayISO() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0,10);
+}
+
+
+  const DURATION_SECONDS = 15 * 60;
+// ✅ Mostrar duración en pantalla automáticamente
+document.getElementById("duracionTxt").textContent = Math.floor(DURATION_SECONDS / 60);
+  // ✅ Bloque de estado
+  let candidate = null;
+  let sessionId = null
+let employeeId = null
+  let QUESTIONS = []
+  let startedAtMs = null;
+  let deadlineMs = null;
+  let timerHandle = null;
+  let current = 0;
+  const answers = {};
+
+  // ✅ Elementos del DOM
+  const stepValidate = document.getElementById("stepValidate");
+  const stepExam = document.getElementById("stepExam");
+  const stepDone = document.getElementById("stepDone");
+
+  const cedulaEl = document.getElementById("cedula");
+  const celularEl = document.getElementById("celular");
+  const emailEl = document.getElementById("email");
+  const confirmEl = document.getElementById("confirm");
+  const tokenEl = document.getElementById("token");
+
+  const btnValidate = document.getElementById("btnValidate");
+  const btnStart = document.getElementById("btnStart");
+  const msgValidate = document.getElementById("msgValidate");
+
+  const who = document.getElementById("who");
+  const whoRole = document.getElementById("whoRole");
+  const timerEl = document.getElementById("timer");
+  const qIndexEl = document.getElementById("qIndex");
+  const qTotalEl = document.getElementById("qTotal");
+  const qBox = document.getElementById("qBox");
+  const msgExam = document.getElementById("msgExam");
+
+  const btnNext = document.getElementById("btnNext");
+  const btnSubmit = document.getElementById("btnSubmit");
+
+  const doneText = document.getElementById("doneText");
+
+  // Total de preguntas
+  qTotalEl.textContent = String(QUESTIONS.length);
+
+ 
+  function show(el) { el.classList.remove("hidden"); }
+  function hide(el) { el.classList.add("hidden"); }
+
+  function fmtTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  function setValidateMsg(text, cls="small") {
+    msgValidate.className = cls;
+    msgValidate.textContent = text;
+  }
+
+  function setExamMsg(text, cls="small") {
+    msgExam.className = cls;
+    msgExam.textContent = text;
+  }
+
+ btnValidate.addEventListener("click", async () => {
+
+const cedula = (cedulaEl.value || "").trim()
+
+if (!cedula) {
+setValidateMsg("Ingresa tu cédula.", "small badTxt")
+return
+}
+
+setValidateMsg("Validando citación...", "small")
+btnValidate.disabled = true
+
+try {
+
+// 1️⃣ buscar empleado por documento
+const { data: employee, error: err1 } = await supabase
+.from("employees")
+.select("id,nombre,cargo")
+.eq("documento", cedula)
+.single()
+
+if (err1 || !employee) {
+candidate = null
+btnStart.disabled = true
+setValidateMsg("Empleado no encontrado.", "small badTxt")
+btnValidate.disabled = false
+return
+}
+
+
+
+// 🔥 2️⃣ VALIDAR TOKEN Y SACAR SESSION REAL
+const token = (tokenEl.value || "").trim().toUpperCase()
+
+if(!token){
+  setValidateMsg("Debes ingresar el token.", "small badTxt")
+  btnValidate.disabled = false
+  return
+}
+
+const { data: tokenRow, error: tokenError } = await supabase
+.from("evaluation_tokens")
+.select("session_id")
+.eq("token", token)
+.eq("activo", true)
+.single()
+
+if(tokenError || !tokenRow){
+  setValidateMsg("Token inválido o expirado.", "small badTxt")
+  btnValidate.disabled = false
+  return
+}
+
+// ✅ SESSION REAL
+sessionId = tokenRow.session_id
+employeeId = employee.id
+
+// 3️⃣ verificar si está citado
+const { data: attendee, error: citError } = await supabase
+.from("citations")
+.select("*")
+.eq("session_id", sessionId)
+.eq("employee_id", employee.id)
+.single()
+
+if (citError || !attendee) {
+
+candidate = null
+btnStart.disabled = true
+setValidateMsg("No estás citado para esta sesión.", "small badTxt")
+  
+} else {
+
+candidate = employee
+btnStart.disabled = false
+setValidateMsg(`Citado: ${employee.nombre}`, "small okTxt")
+  tokenEl.disabled = true
+cedulaEl.disabled = true
+
+}
+
+} catch (e) {
+
+console.error(e)
+setValidateMsg("Error validando citación.", "small badTxt")
+
+}
+
+btnValidate.disabled = false
+
+})
+  btnStart.addEventListener("click", async () => {
+    const token = (tokenEl.value || "").trim().toUpperCase()
+    if(!sessionId){
+  setValidateMsg("Debes validar el token primero.","small badTxt")
+  return
+}
+
+if(!token){
+setValidateMsg("Debes ingresar el token de evaluación.","small badTxt")
+return
+}
+  const { data: tokenRow } = await supabase
+.from("evaluation_tokens")
+.select("evaluation_id, session_id")
+.eq("token",token)
+.eq("activo",true)
+.single()
+
+if(!tokenRow){
+  setValidateMsg("Token inválido o expirado.","small badTxt")
+  return
+}
+
+const evaluationId = tokenRow.evaluation_id
+sessionId = tokenRow.session_id
+if (!candidate) return;
+
+// 🚫 VALIDAR SI YA PRESENTÓ (ANTES DE ENTRAR AL EXAMEN)
+const { data: intentoPrevio, error: intentoError } = await supabase
+.from("exam_results")
+.select("id")
+.eq("employee_id", employeeId)
+.eq("session_id", sessionId)
+.limit(1)
+
+if (intentoError) {
+  setValidateMsg("Error validando intentos.", "small badTxt")
+  return
+}
+
+if (intentoPrevio && intentoPrevio.length > 0) {
+  setValidateMsg("Ya presentaste esta evaluación. No puedes ingresar nuevamente.", "small badTxt")
+  return
+}
+    const celular = (celularEl.value || "").trim();
+    const email = (emailEl.value || "").trim();
+    const confirm = (confirmEl.value || "").trim().toUpperCase();
+
+    if (!celular || !email) return setValidateMsg("Celular y correo son obligatorios.", "small badTxt");
+    if (confirm !== "ACEPTO") return setValidateMsg('Debes escribir "ACEPTO" para iniciar.', "small badTxt");
+
+    candidate.email = email;
+    candidate.celular = celular;
+
+    startedAtMs = Date.now();
+    deadlineMs = startedAtMs + DURATION_SECONDS * 1000;
+
+    
+const { data, error } = await supabase
+.from("evaluation_questions")
+.select("*")
+.eq("evaluation_id", evaluationId)
+
+if (error) {
+setValidateMsg("Error cargando preguntas.", "small badTxt")
+console.error(error)
+return
+}
+
+if (!data || data.length === 0) {
+setValidateMsg("Esta evaluación no tiene preguntas cargadas.", "small badTxt")
+return
+}
+const { data: evalData, error: evalError } = await supabase
+.from("evaluations")
+.select("preguntas_totales")
+.eq("id", evaluationId)
+.single()
+
+if(evalError || !evalData){
+setValidateMsg("No se encontró la configuración de la evaluación.","small badTxt")
+return
+}
+    
+QUESTIONS = data.map(q => ({
+  id: q.id,
+  question: q.pregunta,
+  options: [
+    q.opcion_a,
+    q.opcion_b,
+    q.opcion_c,
+    q.opcion_d
+  ],
+  correct: ["A","B","C","D"].indexOf(q.respuesta_correcta)
+}))
+
+QUESTIONS = shuffleArray(QUESTIONS).slice(0, Math.min(evalData.preguntas_totales, QUESTIONS.length))
+
+qTotalEl.textContent = String(QUESTIONS.length)
+
+hide(stepValidate);
+show(stepExam);
+
+who.textContent = candidate.nombre;
+whoRole.textContent = `(${candidate.cargo})`;
+
+current = 0;
+
+renderQuestion();
+startTimer();
+   });
+
+  function startTimer() {
+
+  const tick = () => {
+
+    const left = Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000));
+
+    timerEl.textContent = fmtTime(left);
+
+    if (left <= 0) {
+      clearInterval(timerHandle)
+      timerHandle = null
+      setExamMsg("Tiempo finalizado. Enviando automáticamente...", "small warn")
+      submitExam(true)
+    }
+
+  }
+
+  tick()
+
+  timerHandle = setInterval(tick, 500)
+
+}
+  function renderQuestion() {
+    const q = QUESTIONS[current];
+    qIndexEl.textContent = String(current + 1);
+
+    const selected = (answers[q.id] ?? null);
+
+    const imgs = (q.images || []).map(src => `<img class="qimg" src="${src}" alt="Imagen de pregunta"/>`).join("");
+
+    const opts = q.options.map((txt, idx) => {
+      const checked = (selected === idx) ? "checked" : "";
+      const letter = String.fromCharCode(65+idx);
+      return `
+        <label class="opt">
+          <input type="radio" name="opt" value="${idx}" ${checked}/>
+          <div><b>${letter}.</b> ${escapeHtml(txt)}</div>
+        </label>
+      `;
+    }).join("");
+
+    qBox.innerHTML = `
+  <h3 style="margin:8px 0 10px">${escapeHtml(q.question)}</h3>
+  ${imgs}
+  <div>${opts}</div>
+`;
+
+    qBox.querySelectorAll('input[name="opt"]').forEach(r => {
+      r.addEventListener("change", (ev) => {
+        answers[q.id] = Number(ev.target.value);
+      });
+    });
+btnNext.disabled = current === QUESTIONS.length - 1;
+    // Flujo sin retroceso: "Enviar" solo en la última pregunta
+    if (current === QUESTIONS.length - 1) {
+      btnNext.classList.add("hidden");
+      btnSubmit.classList.remove("hidden");
+    } else {
+      btnNext.classList.remove("hidden");
+      btnSubmit.classList.add("hidden");
+    }
+
+  }
+btnNext.addEventListener("click", () => {
+    const q = QUESTIONS[current];
+    if (answers[q.id] === undefined) {
+      setExamMsg("Debes seleccionar una respuesta para continuar.", "small warn");
+      return;
+    }
+    if (current < QUESTIONS.length - 1) {
+      current++;
+      renderQuestion();
+    }
+  });
+btnSubmit.addEventListener("click", () => {
+    const q = QUESTIONS[current];
+    if (answers[q.id] === undefined) {
+      setExamMsg("Debes seleccionar una respuesta para enviar.", "small warn");
+      return;
+    }
+    submitExam(false);
+  });
+async function submitExam(isAuto) {
+
+try {
+    btnNext.disabled = true; btnSubmit.disabled = true;
+    if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+
+    const finishedAtMs = Date.now();
+    const durationSeconds = Math.min(DURATION_SECONDS, Math.max(0, Math.floor((finishedAtMs - startedAtMs) / 1000)));
+
+    let score = 0;
+    const total = QUESTIONS.length;
+
+    for (const q of QUESTIONS) {
+      const a = (answers[q.id] ?? -1);
+      if (a === q.correct) score++;
+    }
+    const percent = Math.round((score / total) * 10000) / 100; // 2 decimales
+
+  console.log("SESSION QUE SE ENVIA:", sessionId)
+  
+    const payload = {
+session_id: sessionId,
+employee_id: employeeId,
+cedula: (cedulaEl.value || "").trim(),
+nombre: candidate.nombre,
+cargo: candidate.cargo,
+email: candidate.email,
+celular: candidate.celular,
+started_at: new Date(startedAtMs).toISOString(),
+finished_at: new Date(finishedAtMs).toISOString(),
+duration_seconds: durationSeconds,
+score: score,
+total: total,
+percent: percent,
+answers: answers,
+auto_submitted: !!isAuto
+}
+
+const { error: saveError } = await supabase
+.from("exam_results")
+.insert(payload)
+
+if(saveError){
+console.error(saveError)
+setExamMsg("Error: " + (saveError?.message || e.message), "small badTxt");
+return
+}
+
+
+      hide(stepExam);
+      show(stepDone);
+
+     // 🎯 MENSAJE FINAL CON MASCOTA
+let mensajeFinal = "";
+let color = "";
+
+// 👇 usa tu imagen
+const imagen = "mascota.png";
+
+if (percent >= 80) {
+  mensajeFinal = "🎉 ¡Felicitaciones! Has aprobado la evaluación.";
+  color = "okTxt";
+
+  // 🎉 LANZAR CONFETTI
+  setTimeout(() => {
+    lanzarConfetti();
+  }, 500);
+
+} else {
+  mensajeFinal = "💪 No alcanzaste el puntaje requerido, pero puedes lograrlo. Sigue esforzándote.";
+  color = "warn";
+}
+
+doneText.innerHTML = `
+  <div style="text-align:center">
+    
+    <img src="${imagen}" 
+         style="height:220px;margin-bottom:15px;filter:drop-shadow(0 10px 20px rgba(0,0,0,0.4))"/>
+
+    <h3 class="${color}">${mensajeFinal}</h3>
+    
+    <p>
+      Cédula: <b>${escapeHtml(payload.cedula)}</b><br/>
+      Puntaje: <b>${payload.score} / ${payload.total}</b><br/>
+      Porcentaje: <b>${payload.percent}%</b>
+    </p>
+
+  </div>
+`;
+    } catch (e) {
+      console.error(e);
+      setExamMsg("Error guardando resultados. No cierres la página: informa al evaluador.", "small badTxt");
+      btnSubmit.disabled = false;
+    }
+  }
+
+function lanzarConfetti() {
+  const duration = 2000;
+  const end = Date.now() + duration;
+
+  (function frame() {
+    confetti({
+      particleCount: 5,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0 }
+    });
+
+    confetti({
+      particleCount: 5,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1 }
+    });
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame);
+    }
+  })();
+}
+  
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+</script>
+</body>
+</html>
